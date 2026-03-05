@@ -3,6 +3,7 @@ from typing import Union
 import aioboto3
 from botocore.exceptions import (
     BotoCoreError,
+    ClientError,
     NoCredentialsError,
     HTTPClientError,
     ConnectionError
@@ -56,12 +57,25 @@ class S3StorageClient(S3StorageInterface):
             async with self._session.client(
                 "s3", endpoint_url=self._endpoint_url
             ) as client:
-                await client.put_object(
-                    Bucket=self._bucket_name,
-                    Key=file_name,
-                    Body=file_data,
-                    ContentType="image/jpeg"
-                )
+                try:
+                    await client.put_object(
+                        Bucket=self._bucket_name,
+                        Key=file_name,
+                        Body=file_data,
+                        ContentType="image/jpeg",
+                    )
+                except ClientError as e:
+                    error_code = e.response.get("Error", {}).get("Code", "")
+                    if error_code in ("NoSuchBucket", "404"):
+                        await client.create_bucket(Bucket=self._bucket_name)
+                        await client.put_object(
+                            Bucket=self._bucket_name,
+                            Key=file_name,
+                            Body=file_data,
+                            ContentType="image/jpeg",
+                        )
+                    else:
+                        raise
         except (ConnectionError, HTTPClientError, NoCredentialsError) as e:
             raise S3ConnectionError(f"Failed to connect to S3 storage: {str(e)}") from e
         except BotoCoreError as e:
