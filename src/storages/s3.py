@@ -41,13 +41,19 @@ class S3StorageClient(S3StorageInterface):
             aws_secret_access_key=self._secret_key,
         )
 
-    async def upload_file(self, file_name: str, file_data: Union[bytes, bytearray]) -> None:
+    async def upload_file(
+        self,
+        file_name: str,
+        file_data: Union[bytes, bytearray],
+        content_type: str = "application/octet-stream"
+    ) -> None:
         """
         Asynchronously upload a file to the S3-compatible storage.
 
         Args:
             file_name (str): The name of the file to be stored.
             file_data (Union[bytes, bytearray]): The file data in bytes.
+            content_type (str): The content type of the file. Defaults to "application/octet-stream".
 
         Raises:
             S3ConnectionError: If there is a connection error with S3.
@@ -62,7 +68,7 @@ class S3StorageClient(S3StorageInterface):
                         Bucket=self._bucket_name,
                         Key=file_name,
                         Body=file_data,
-                        ContentType="image/jpeg",
+                        ContentType=content_type,
                     )
                 except ClientError as e:
                     error_code = e.response.get("Error", {}).get("Code", "")
@@ -72,7 +78,7 @@ class S3StorageClient(S3StorageInterface):
                             Bucket=self._bucket_name,
                             Key=file_name,
                             Body=file_data,
-                            ContentType="image/jpeg",
+                            ContentType=content_type,
                         )
                     else:
                         raise

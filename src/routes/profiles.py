@@ -82,8 +82,18 @@ async def create_profile(
             detail="You don't have permission to edit this profile."
         )
 
+    user_by_param = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user_by_param = user_by_param.scalar_one_or_none()
+
+    if not user_by_param or not user_by_param.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or not active."
+        )
+
     form = await request.form()
     info_raw = form.get("info")
+
     if info_raw is None or not str(info_raw).strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -120,11 +130,15 @@ async def create_profile(
         date_of_birth=profile_data.date_of_birth,
         info=profile_data.info
     )
-
-    avatar_key = f"avatars/{user_id}_avatar.jpg"
+    file_extension = profile_data.avatar.filename.split(".")[-1]
+    avatar_key = f"avatars/{user_id}_avatar.{file_extension}"
     file_data = await profile_data.avatar.read()
     try:
-        await s3_client.upload_file(file_name=avatar_key, file_data=file_data)
+        await s3_client.upload_file(
+            file_name=avatar_key,
+            file_data=file_data,
+            content_type=profile_data.avatar.content_type
+        )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
